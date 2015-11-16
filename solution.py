@@ -3,7 +3,6 @@
 
 import unicodedata as ud, re, string, sys, os, simplejson
 from itertools import islice, chain
-from textblob import TextBlob
 
 '''
     Helper class to highlight clean text 
@@ -112,26 +111,11 @@ def extract_tweet_text_and_timestamp(input_file):
                 if not line: # To filter out keep-alive new lines
                     continue
                 single_tweet = simplejson.loads(line)
-                
                 if 'text' in single_tweet:
                     
                     text = single_tweet['text']
                     time_stamp = single_tweet['created_at']
-                    lang = single_tweet["lang"]
                     
-                    if single_tweet["lang"] != 'en' and single_tweet["lang"] != 'und':
-                        tblob = TextBlob(text)
-                        frm_ln = lang
-                        print "Conversion from : ", frm_ln
-                        # Translation of tweets from native lang to 'en'
-                        tweet_text = tblob.translate(from_lang=frm_ln, to="en")
-                        con_text = str(tweet_text)
-                        with open('sample.json', 'a') as f:
-                            simplejson.dump("{} ==> {}".format(frm_ln, con_text), f)
-                    elif single_tweet["lang"] != 'und':
-                        with open('sample.json', 'a') as f:
-                            con_text = to_str(text)
-                            simplejson.dump("{} ==> {}".format(lang, con_text), f)
                     yield text, time_stamp
     
     except IOError:
