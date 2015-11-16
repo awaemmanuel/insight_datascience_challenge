@@ -2,3 +2,5 @@
 *.py[cod]
 *.twitter
 .DS_Store
+*.nogit
+*.ipynb*
