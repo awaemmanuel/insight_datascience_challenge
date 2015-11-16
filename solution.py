@@ -3,10 +3,26 @@
 
 import unicodedata as ud, re, string, sys, os, simplejson
 from itertools import islice, chain
+from collections import OrderedDict
+
+######### HELPER CLASSES #################
+def constant(f):
+    def fset(self, value):
+        raise TypeError
+    def fget(self):
+        return f()
+    return property(fget, fset)
+
+class _Const(object):
+    @constant
+    def HASH_GRAPH_UPDATE_INTERVAL():
+        return 60
+
 
 '''
     Helper class to highlight clean text 
 '''
+
 class color(object):
    PURPLE = '\033[95m'
    CYAN = '\033[96m'
@@ -81,18 +97,6 @@ def is_not_only_punc(text):
     return True if [char for char in text_list if not pattern.match(char)] else False
     
     
-'''
-   Extract hashtags from text if any
-   Normalize for unicode and possibility of mulitple #s
-'''
-
-def get_hashtags(text):
-    #Fetch and clean hashtags from tweet
-    tags = list(set([re.sub(r"#+", "#", k) for k in set([re.sub(r"(\W+)$", "", j, flags = re.UNICODE) for j in set([i for i in text.split() if i.startswith("#")])])]))
-    
-    return [tag for tag in tags]
-
-
 '''
     Function that guarantees we process only basic latin characters
 '''
@@ -207,7 +211,7 @@ def process_tweets(input_file, output_file):
         try:
             with open(output_file, 'a') as f:
                 if not is_empty(clean_text) and is_not_only_punc(clean_text):
-                    f.write("{} ({})\n".format(clean_text, clean_time))
+                    f.write("{} (timestamp: {})\n".format(clean_text, clean_time))
         except IOError:
             sys.stderr.write("[process_tweets] - Error: Could not open {}".format(output_file))
             sys.exit(-1)
@@ -228,9 +232,61 @@ class InsightChallengeSolution(object):
         self.output_file = output_filename
         self.num_tweets_with_unicode = 0
         self.has_unicode = False
-        self.hashtag_graph = {}
+        self.tag_hashtag_graph = OrderedDict() #Final graph of hashtag to hashtag
+        self.tweet_time_hashtag_graph = OrderedDict() # Track time and associating hashtags
+        self.time_of_latest_tweet = 0
+        self.text = ''
+        self.timestamp = 0
+        self.lastupdate = 0
         
-################# SCRIPT EXECUTION #######################
+        
+        CONST = _Const()
+        self.update_interval = CONST.HASH_GRAPH_UPDATE_INTERVAL
+        
+        
+    
+    '''
+        Solution of feature 2 - Hash Tag Graph
+    '''
+    
+    def build_hashtag_graph(self):
+        
+        return None
+    
+    '''
+        Calculate Graph Average Degrees
+    '''
+    def get_graph_average_degrees(self):
+        running_total = 0         
+        for k, v in self.graph.iteritems():
+            running_total += len(v)
+        return running_total / float(len(self.graph))
+    
+    
+    
+    '''
+        Extract hashtags from text if any
+        Account for unicode and possibility of mulitple #s
+    '''
+    
+    def get_hashtags(self):
+        #Fetch and clean hashtags from tweet
+        return list(set([re.sub(r"#+", "#", k) for k in set([re.sub(r"(\W+)$", "", j, flags = re.UNICODE) for j in set([i for i in self.text.split() if i.startswith("#")])])]))
+
+    
+    
+    '''
+        Function that returns the time of a tweet
+        
+        :type str: timestamp
+        :rtype List[str]
+    '''
+    
+    def get_tweet_time(self):
+        return self.timestamp.strip().split()[3].split(':')
+    
+    
+    ################# SCRIPT EXECUTION #######################
 if __name__ == '__main__':
     
     file_dir = os.path.dirname(os.path.realpath('__file__'))
