@@ -50,6 +50,7 @@ def to_str(unicode_or_str):
 def strip_unicode(text):
     #REGEX for tweet unicode removal
     str_text = to_str(text)
+    #str_text = ud.normalize('NFKD', text).encode('ascii','ignore') # Incase we want to 
     str_text =  re.sub(r'(\\u[0-9A-Fa-f]+)', '', str_text)
     return to_unicode(str_text)
 
@@ -87,10 +88,18 @@ def is_not_only_punc(text):
 
 def get_hashtags(text):
     #Fetch and clean hashtags from tweet
-    #text = unicode(text)
     tags = list(set([re.sub(r"#+", "#", k) for k in set([re.sub(r"(\W+)$", "", j, flags = re.UNICODE) for j in set([i for i in text.split() if i.startswith("#")])])]))
     
     return [tag for tag in tags]
+
+
+'''
+    Function that guarantees we process only basic latin characters
+'''
+
+def remove_non_basic_latin_chars(text):
+    # Process only basic latin characters else continue
+    return ''.join([c for c in text if ord(c) in xrange(32, 128)])
 
 
 ############## PROCESS FLOW FUNCTIONS ####################
@@ -130,26 +139,21 @@ def extract_tweet_text_and_timestamp(input_file):
 '''
 def clean_string(text):
     
-    if not text: return ""
-    
+    if not text: return ("", False)
+        
     text_has_unicode = False
     
-        
-    # Convert text to raw literals to avoid regex issues.
+    # Convert text to raw literals and unicode to avoid regex  and internal processing issues.
     text = text.replace("\\", "\\\\")
     text = to_unicode(text)
     
     # Unicode pattern
     unicode_pattern = re.compile(u'(\\u[0-9A-Fa-f]+)')
-    #print "Contains ==> ", contains_pattern(text, unicode_pattern)
-    
     
     # Keep track of texts with unicode and then remove the unicode chars
     if contains_pattern(text, unicode_pattern):
         text_has_unicode = True
-        text = ud.normalize('NFKD', text).encode('ascii','ignore')
-        #text = re.sub(unicode_pattern, '', text)
-        #text = strip_unicode(text)
+        text = strip_unicode(text)
 
     # Remove escape characters. This is faster than using re.compile(r'\s+') class
     text = ' '.join(text.strip().split())
@@ -172,35 +176,29 @@ def process_tweets(input_file, output_file):
     # Global variable initializations
     num_tweets_with_unicode = 0
     has_unicode = False
-    #results = []
-    
-#    for idx, text in enumerate(islice(extract_tweet_text_and_timestamp(input_file), 20)):
-#        results.append(text[0])
-#    
-#    return results
 
     # Extract tweet text and timestamp with generator
     for text_and_time in extract_tweet_text_and_timestamp(input_file):
         text = text_and_time[0]
         time_stamp = text_and_time[1]
         
+        # Proceed only with non basic latin characters
+        text = remove_non_basic_latin_chars(text)
+        
+        # tweet was composed of non basic latin chars
+        if not text:
+            continue
+            
         # Clean out text
         clean_text, has_unicode = clean_string(text)
         clean_text = clean_text.strip()
-        #clean_text = clean_text.encode('utf-8')
-        
-        if (has_unicode):
-            num_tweets_with_unicode += 1
-        
-        #print "TEXT AFTER STRIP ==> ", clean_text, has_unicode, type(clean_text)
-        
+          
         # Sanity Check on timestamp
         clean_time, _ = clean_string(time_stamp)
         
-        #print "TEXT AFTER STRIP ==> ", clean_time, _ , type(clean_time)
-        
-        #sys.exit(-1)
-        
+        if (has_unicode):
+            num_tweets_with_unicode += 1
+    
         # Retrieve hashtags if any in tweet
         if r'#' in clean_text:
             tags = get_hashtags(clean_text)
@@ -221,7 +219,18 @@ def process_tweets(input_file, output_file):
     except IOError:
         sys.stderr.write("[process_tweets] - Error: Could not open {}".format(output_file))
         sys.exit(-1)
+
         
+class InsightChallengeSolution(object):
+    
+    def __init__(self, input_filename, output_filename):
+        self.input_file = input_filename
+        self.output_file = output_filename
+        self.num_tweets_with_unicode = 0
+        self.has_unicode = False
+        self.hashtag_graph = {}
+        
+################# SCRIPT EXECUTION #######################
 if __name__ == '__main__':
     
     file_dir = os.path.dirname(os.path.realpath('__file__'))
@@ -231,4 +240,3 @@ if __name__ == '__main__':
     process_tweets(input_file, output_file)
     
     print "Done. OK!"
-#    print repr(t)
