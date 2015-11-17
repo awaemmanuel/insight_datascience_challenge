@@ -203,10 +203,6 @@ def process_tweets(input_file, output_file):
         if (has_unicode):
             num_tweets_with_unicode += 1
     
-        # Retrieve hashtags if any in tweet
-        if r'#' in clean_text:
-            tags = get_hashtags(clean_text)
-        
         # Write to output file
         try:
             with open(output_file, 'a') as f:
@@ -228,20 +224,22 @@ def process_tweets(input_file, output_file):
 class InsightChallengeSolution(object):
     
     def __init__(self, input_filename, output_filename):
+        CONST = _Const()
+        self.update_interval = CONST.HASH_GRAPH_UPDATE_INTERVAL
         self.input_file = input_filename
         self.output_file = output_filename
         self.num_tweets_with_unicode = 0
         self.has_unicode = False
-        self.tag_hashtag_graph = OrderedDict() #Final graph of hashtag to hashtag
-        self.tweet_time_hashtag_graph = OrderedDict() # Track time and associating hashtags
         self.time_of_latest_tweet = 0
         self.text = ''
         self.timestamp = 0
         self.lastupdate = 0
+        self.tags = []
         
+        # Tables to hold Tracking and Routing information of hashtags.
+        self.tag_hashtag_graph = OrderedDict() # Final graph of hashtag to hashtag
+        self.tweet_time_hashtag_graph = OrderedDict() # Track time and associating hashtags
         
-        CONST = _Const()
-        self.update_interval = CONST.HASH_GRAPH_UPDATE_INTERVAL
         
         
     
@@ -251,6 +249,45 @@ class InsightChallengeSolution(object):
     
     def build_hashtag_graph(self):
         
+        
+        # Extract tweet text and timestamp with generator
+        for text_and_time in extract_tweet_text_and_timestamp(self.input_file):
+            self.text = text_and_time[0]
+            self.timestamp = text_and_time[1]
+
+            # Proceed only with non basic latin characters
+            self.text = remove_non_basic_latin_chars(text)
+
+            # tweet was composed of non basic latin chars
+            if not self.text:
+                continue
+
+            # Clean out text
+            self.text, has_unicode = clean_string(self.text)
+            self.text = self.text.strip()
+
+            # Sanity Check on timestamp
+            self.timestamp, _ = clean_string(self.timestamp)
+        
+            # Retrieve hashtags if any in tweet
+            if r'#' in self.text:
+                self.tags = get_hashtags()
+            
+            '''
+                Track time hashtag was created and hashtags.
+                :Key str: Time of creation
+                :Value List[str]: Hashtags
+            '''
+            created_at = ''.join(get_tweet_time())
+            self.tweet_time_hashtag_graph[created_at] = self.tags
+            
+            # Update hashtag graph, creating edges for 2 or more distinct tags 
+            # TODO - Figure a way to cycle once.
+            if (len(self.tags) > 1):
+                for tag in self.tags:
+                    self.tag_hashtag_graph[tag]
+            
+            
         return None
     
     '''
