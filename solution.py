@@ -3,7 +3,8 @@
 
 import unicodedata as ud, re, string, sys, os, simplejson
 from itertools import islice, chain
-from collections import OrderedDict
+from collections import OrderedDict, deque
+from helper-modules import Graph
 
 ######### HELPER CLASSES #################
 def constant(f):
@@ -224,6 +225,7 @@ def process_tweets(input_file, output_file):
 class InsightChallengeSolution(object):
     
     def __init__(self, input_filename, output_filename):
+        ''' Initiate Solution Object '''
         CONST = _Const()
         self.update_interval = CONST.HASH_GRAPH_UPDATE_INTERVAL
         self.input_file = input_filename
@@ -234,11 +236,11 @@ class InsightChallengeSolution(object):
         self.text = ''
         self.timestamp = 0
         self.lastupdate = 0
-        self.tags = []
+        self.tags = set()
         
         # Tables to hold Tracking and Routing information of hashtags.
-        self.tag_hashtag_graph = OrderedDict() # Final graph of hashtag to hashtag
         self.tweet_time_hashtag_graph = OrderedDict() # Track time and associating hashtags
+        self.hashtag_graph = Graph() # Final graph of hashtag to hashtag
         
         
         
@@ -272,12 +274,11 @@ class InsightChallengeSolution(object):
             # Retrieve hashtags if any in tweet
             if r'#' in self.text:
                 self.tags = get_hashtags()
-            
-            '''
-                Track time hashtag was created and hashtags.
-                :Key str: Time of creation
-                :Value List[str]: Hashtags
-            '''
+            else:
+                continue # No hashtags
+
+                
+            # Track time of creating the hashtags
             created_at = ''.join(get_tweet_time())
             self.tweet_time_hashtag_graph[created_at] = self.tags
             
@@ -295,8 +296,8 @@ class InsightChallengeSolution(object):
     '''
     def get_graph_average_degrees(self):
         running_total = 0         
-        for k, v in self.graph.iteritems():
-            running_total += len(v)
+        for v, e in self.graph.iteritems():
+            running_total += len(e)
         return running_total / float(len(self.graph))
     
     
@@ -308,7 +309,7 @@ class InsightChallengeSolution(object):
     
     def get_hashtags(self):
         #Fetch and clean hashtags from tweet
-        return list(set([re.sub(r"#+", "#", k) for k in set([re.sub(r"(\W+)$", "", j, flags = re.UNICODE) for j in set([i for i in self.text.split() if i.startswith("#")])])]))
+        return set([re.sub(r"#+", "#", k) for k in set([re.sub(r"(\W+)$", "", j, flags = re.UNICODE) for j in set([i for i in self.text.split() if i.startswith("#")])])])
 
     
     
@@ -318,11 +319,16 @@ class InsightChallengeSolution(object):
         :type str: timestamp
         :rtype List[str]
     '''
-    
     def get_tweet_time(self):
         return self.timestamp.strip().split()[3].split(':')
     
     
+    '''
+        Function that shows our current graph state
+    '''
+    def display_hashtag_graph(self):
+        print self.hashtag_graph
+            
     ################# SCRIPT EXECUTION #######################
 if __name__ == '__main__':
     
