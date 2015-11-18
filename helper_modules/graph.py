@@ -1,10 +1,12 @@
 from collections import OrderedDict
 
+# Graph implementation adapted from Graphs in Python (http://www.python-course.eu/graphs_python.php) to suit the chosen design f
 '''
     Class implementing the behaviors, attributes and functionalities of a graph needed for a
     hashtag graph
     
     Using OrderedDict to hold order of insertion of hashtags into graph.
+    
 '''
 
 # Graph implemented with a dictionary
@@ -39,13 +41,11 @@ class Graph(object):
         otherwise adds vertex with an empty list
         to collect it's adjacent neighbors. 
     '''
-    
     def add_vertex(self, vertex):
-        print "=====> add_vertex() Graph before add_vertex: {}".format(self.graph_dict)
-        if vertex not in self.graph_dict:
+        if (vertex not in self.graph_dict):
             self.graph_dict[vertex] = []
-            print "=====> add_vertex() - Adding  vertex: {} to graph now: {}".format(vertex, self.graph_dict)
 
+    
     '''
         Setter: Adds an edge to a graph
         
@@ -53,19 +53,27 @@ class Graph(object):
     '''       
     
     def add_edge(self, edge):
-        print "=====> add_edge() Graph before add_edge: {}".format(self.graph_dict)
-        #edge = set(edge)
         (v1, v2) = tuple(edge)
-        print "=====> add_edge() -BEFORE ADDING . Adding {} to {}. graph now: {}".format(v2, v1, self.graph_dict)
-        if v1 in self.graph_dict:
-            if v2 not in self.graph_dict[v1]:
+        if (v1 in self.graph_dict):
+            if (v2 not in self.graph_dict[v1]):
                 self.graph_dict[v1].append(v2)
-                print "=====> add_edge() - {} already in graph and {} not in list: {}, graph now: {}".format(v1, v2, self.graph_dict[v1], self.graph_dict)
         else:
             self.graph_dict[v1] = [v2]
-            print "=====> add_edge() - {} not in graph. Adding {} to {}. {} list: {}, graph now: {}".format(v1, v2, v1, v1, self.graph_dict[v1], self.graph_dict)
 
-            
+    
+    
+    '''
+        Function that removes edge between two vertices.
+        Edge is a set/tuple of vertices
+    '''
+    def remove_edge(self, edge):
+        (v1, v2) = tuple(edge)
+        if (v1 in self.graph_dict):
+            if (v2 in self.graph_dict[v1]): # For readability, could use one if cond1 and cond2
+                self.graph_dict[v1].remove(v2)
+                
+                
+    
     '''
         Function that calculates the degree of a single vertex.
         
@@ -75,10 +83,8 @@ class Graph(object):
         cycles were allowed, then degree of a vertex would be sum of adjacent
         vertices plus occurence of vertex in it's own adject neighbor list
     '''
-    
     def vertex_degree(self, vertex):
         neighbors =  self.graph_dict[vertex]
-        #print "==> VERTEX: {}, Neighbors: {}".format(vertex, self.graph_dict[vertex])
         degree = len(neighbors) + neighbors.count(vertex)
         return degree
     
@@ -88,10 +94,8 @@ class Graph(object):
     '''
     def get_graph_average_degrees(self):
         running_total = 0
-        #print "Graph: {}".format(self.graph_dict)
         for vertex in self.graph_dict:
             running_total += self.vertex_degree(vertex)
-            #print "Vertex: {}, Vertex Degree: {}, Running Total: {}, Num Vertices: {}".format(vertex, self.vertex_degree(vertex), running_total, len(self.graph_dict))
         return running_total / float(len(self.graph_dict))
     
     '''
@@ -99,21 +103,37 @@ class Graph(object):
         
         Edges are internally represented as set two vertices 
     '''
-    
     def generate_graph_edges(self):
         edges = []
         for vertex in self.graph_dict:
             for neighbour in self.graph_dict[vertex]:
-                if {neighbour, vertex} not in edges:
+                if ({neighbour, vertex} not in edges):
                     edges.append({vertex, neighbour})
         return edges
 
-    
+    '''
+        Function that finds a path between two vertices in graph
+    '''
+    def find_path(self, st, en, path=[]):
+        graph = self.graph_dict
+        path = path + [st]
+        if (st == en):
+            return path
+        if (st not in graph):
+            return None
+        for vertex in graph[st]:
+            if (vertex not in path):
+                extended_path = self.find_path(vertex, 
+                                               en, 
+                                               path)
+                if (extended_path): 
+                    return extended_path
+        return None
    
+
     '''
         Overwritten function: To have a representation of graph when printed.
     '''
-    
     def __str__(self):
         result = "vertices: "
         for v in self.graph_dict:

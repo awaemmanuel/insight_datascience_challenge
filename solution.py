@@ -1,10 +1,15 @@
 #!/usr/bin/env python
 # -*- coding: UTF-8 -*-
 
+# Standard Library Importations
 import unicodedata as ud, re, string, sys, os, simplejson
 from itertools import islice, chain
 from collections import OrderedDict, deque
+from datetime import datetime, timedelta
+
+# Personal Libraries import
 from helper_modules import graph
+
 
 ######### HELPER CLASSES #################
 def constant(f):
@@ -17,7 +22,7 @@ def constant(f):
 class _Const(object):
     @constant
     def HASH_GRAPH_UPDATE_INTERVAL():
-        return 60
+        return 59
 
 
 '''
@@ -235,10 +240,10 @@ class InsightChallengeSolution(object):
         ''' Initiate Solution Object '''
         CONST = _Const()
         self.update_interval = CONST.HASH_GRAPH_UPDATE_INTERVAL
+        self.time_graph_last_modified = ''
         self.input_file = input_filename
         self.output_file = output_filename
         self.num_tweets_with_unicode = 0
-        self.has_unicode = False
         self.time_of_latest_tweet = 0
         self.text = ''
         self.timestamp = 0
@@ -258,6 +263,8 @@ class InsightChallengeSolution(object):
     
     def build_hashtag_graph(self):
         
+        # First ever tweet with 2 or more distinct hashtag timestamp
+        t1 = '' 
         
         # Extract tweet text and timestamp with generator
         for text_and_time in extract_tweet_text_and_timestamp(self.input_file):
@@ -265,7 +272,7 @@ class InsightChallengeSolution(object):
             self.timestamp = text_and_time[1]
 
             # Proceed only with non basic latin characters
-            self.text = remove_non_basic_latin_chars(text)
+            self.text = remove_non_basic_latin_chars(self.text)
 
             # tweet was composed of non basic latin chars
             if not self.text:
@@ -279,24 +286,44 @@ class InsightChallengeSolution(object):
             self.timestamp, _ = clean_string(self.timestamp)
         
             # Retrieve hashtags if any in tweet
-            if r'#' in self.text:
-                self.set_of_tags = get_hashtags()
+            if (r'#' in self.text):
+                self.set_of_tags = self.get_hashtags()
             else:
                 continue # No hashtags
 
-                
-            # Track time of creating the hashtags
-            created_at = ''.join(get_tweet_time())
-            self.tweet_time_hashtag_graph[created_at] = self.set_of_tags
-            
+            # No need to proceed if the hashtags no valid has tag was retrieved
             # Update hashtag graph, creating edges for 2 or more distinct tags 
             if (len(self.set_of_tags) > 1):
-                print_out("GETTING TO UPDATE")
-                self.hashtag_graph.update_graph(list(self.set_of_tags), False)
-                self.hashtag_graph.update_graph(list(self.set_of_tags), True)
-            
-            
-        return None
+                
+                # Track time of creating the hashtags
+                self.tweet_time_hashtag_graph[self.timestamp] = self.set_of_tags
+                all_times = self.tweet_time_hashtag_graph.keys()
+                
+                if not t1: # Assign only once.
+                    t1 = all_times[0]
+                    self.time_graph_last_modified = t1 
+                t2 = self.timestamp
+                
+                # Create all permutations of edges
+                self.update_graph(list(self.set_of_tags), False)
+                self.update_graph(list(self.set_of_tags), True)
+                
+                # Check if time window has elaspsed.
+                # remove edges of first hashtags in tweet_time_hashtag_graph map
+                if (self.hashtag_time_window_elapsed((t1, t2))):
+                    self.time_graph_last_modified = t2
+                    self.remove_hashtags_edge(self.tweet_time_hashtag_graph[t1])
+                    
+                
+                # Calculate Average Degree and Write to file
+                avg_deg = self.hashtag_graph_average_degrees()
+                try:
+                    with open(self.output_file, 'a') as f:
+                        f.write("{}\n".format(avg_deg))
+                except IOError:
+                    sys.stderr.write("[build_hashtag_graph] - Error: Could not open {}".format(output_file))
+                    sys.exit(-1)
+                        
     
     '''
         Helper function: Update graph from a list of vertices tha define a sub-graph.
@@ -316,12 +343,12 @@ class InsightChallengeSolution(object):
             6. #Apache -- #Storm
         
         
-        :type list_of_vertices: List[str]
+        :type List[str]: list_of_vertices 
         :type reverse: boolean - reverse list to create second set of edge combinations
         :type direction to rotate list (-n ==> n steps to left, n ==> n steps to right) : int
     '''
     def update_graph(self, list_of_vertices, reverse, dir=-1):
-        if len(list_of_vertices) < 2:
+        if (len(list_of_vertices) < 2):
             return
         
         # For second set of edge permuations from list
@@ -330,16 +357,11 @@ class InsightChallengeSolution(object):
             
         q = deque(list_of_vertices)
         
-        for i in xrange(len(list_of_vertices)):
-            print "===>update_graph: Run #{} Queue Before: {}".format(i, q)
-            print "=====>Need to add vertex {} and Edge {}".format(q[0], (q[0], q[1]))
+        # Add vertices and edges.
+        for _ in xrange(len(list_of_vertices)):
             self.hashtag_graph.add_vertex(q[0]) # Add vertex into graph
             self.hashtag_graph.add_edge((q[0], q[1])) # Create edge between both vertex
-            
-            print "===>update_graph: Added vertex {} and Edge {}".format(q[0], (q[0], q[1]))
             q.rotate(dir)
-            
-            print "===>Queue After: {}\n\n".format(q)
         # Clean up
         q.clear()
         
@@ -348,8 +370,31 @@ class InsightChallengeSolution(object):
         Calculate Graph Average Degrees
     '''
     def hashtag_graph_average_degrees(self):
-        return self.hashtag_graph.get_graph_average_degrees()
+        # Rounding to two decimal places
+        return round(self.hashtag_graph.get_graph_average_degrees(), 2) 
     
+    
+    '''
+        Find path between two hashtags in graph to enable path deletion
+    '''
+    def find_hashtag_path(self, st, en):
+        return self.hashtag_graph.find_path(st, en)
+    
+    '''
+        Remove edges between hashtags
+    '''
+    def remove_hashtags_edge(self, list_of_vertices, dir=-1):
+        if (len(list_of_vertices) < 2):
+            return
+            
+        q = deque(list_of_vertices)
+        
+        for _ in xrange(len(list_of_vertices)):
+            self.hashtag_graph.remove_edge((q[0], q[1]))
+            q.rotate(dir)
+        
+        # Clean up
+        q.clear()
     
     
     '''
@@ -374,11 +419,58 @@ class InsightChallengeSolution(object):
     
     
     '''
+        Function that returns date time format from tweet format
+        
+        :type str: Tweet time string
+        :rytpe: datetime object
+    '''
+    def format_tweettime_to_datetime(self, time_str):
+        time_arr = time_str.strip().split()
+        temp = time_arr[1:3]
+        temp.append(time_arr[-1])
+        temp.append(time_arr[3])
+        return ' '.join(temp)
+   
+
+    '''
+        Function that calculates if time window is elaspsed
+        
+        :type tuple(timestamp strings): Tuple of two tweet timestamp
+        :rtype: boolean
+    '''
+    def hashtag_time_window_elapsed(self, timestamps):
+        (t1, t2) = tuple(timestamps)
+        
+        # Times didn't have only digits
+        if (not t1 or not t2):
+            return
+        
+        t1 = self.format_tweettime_to_datetime(t1)
+        t2 = self.format_tweettime_to_datetime(t2)
+        
+        dt1 = datetime.strptime(t1, '%b %d %Y %H:%M:%S')
+        dt2 = datetime.strptime(t2, '%b %d %Y %H:%M:%S')
+        if ((dt1 - dt2).seconds >= self.update_interval):
+            return True
+        return False
+    
+    
+    '''
         Function that shows our current graph state
     '''
     def display_hashtag_graph(self):
         print self.hashtag_graph
+    
+    
+    '''
+        Function converts string array to int array
         
+        Asssumes all elements are string representations of valid non-negative numbers.
+    '''
+    def to_int(list_of_strs):
+        l = len(list_of_strs)
+        nt =  [int(i) for i in list_of_strs if i.isdigit()]
+        return nt if (l == len(nt)) else []
     
             
     ################# SCRIPT EXECUTION #######################
@@ -387,38 +479,18 @@ if __name__ == '__main__':
     file_dir = os.path.dirname(os.path.realpath('__file__'))
     input_file = file_dir + '/data-gen/tweets.txt'
     output_file = file_dir + '/data-gen/output.txt'
-    
-    #### TESTING - Needs to be cleaned before submission ########
-    #Spark, #Apache (timestamp: Thu Oct 29 17:51:01 +0000 2015)
-    #Apache, #Hadoop, #Storm (timestamp: Thu Oct 29 17:51:30 +0000 2015)
-    #Apache (timestamp: Thu Oct 29 17:51:55 +0000 2015)
-    #Flink, #Spark (timestamp: Thu Oct 29 17:51:56 +0000 2015)
-    #HBase, #Spark (timestamp: Thu Oct 29 17:51:59 +0000 2015)
-    #Hadoop, #Apache (timestamp: Thu Oct 29 17:52:05 +0000 2015)
-    lt_0 = ['#Spark', '#Apache']
-    lt_1 = ['#Apache', '#Hadoop', '#Storm']
-    lt_2 = ['#Apache']
-    lt_3 = ['#Flink', '#Spark']
-    lt_4 = ['#HBase', '#Spark']
-    lt_5 = ['#Hadoop', '#Apache']
+    output_file2 = file_dir + '/data-gen/output2.txt'
     
     
-    #print_out("Starting Feature 1")
-    #process_tweets(input_file, output_file)
+    print_out("Starting Feature 1")
+    process_tweets(input_file, output_file)
     
     # Solution to feature 2
     print_out("Starting Feature 2")
-    solution_2 = InsightChallengeSolution(input_file, output_file)
-    cw = -1
-    ccw = 1
-    solution_2.update_graph(lt_0,False)
-    solution_2.update_graph(lt_0,True)
-    
-    solution_2.update_graph(lt_1, False)
-    solution_2.update_graph(lt_1, True)
-    #solution_2.update_graph(lt_2)
-    #solution_2.update_graph(lt_3)
-    solution_2.display_hashtag_graph()
-    print "Average Degree: {}".format(solution_2.hashtag_graph_average_degrees())
+    solution_2 = InsightChallengeSolution(input_file, output_file2)
+    solution_2.build_hashtag_graph()
+
+    # For Debugging do not uncomment unless needed.
+    #solution_2.display_hashtag_graph()
     
     print_out("Done. OK!")
