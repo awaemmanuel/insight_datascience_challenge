@@ -1,4 +1,4 @@
-Output of second feature should go in this file.2.0
+2.0
 1.7
 1.58
 1.5
