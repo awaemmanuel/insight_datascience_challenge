@@ -478,18 +478,21 @@ if __name__ == '__main__':
     
     file_dir = os.path.dirname(os.path.realpath('__file__'))
     input_file = file_dir + '/data-gen/tweets.txt'
-    output_file = file_dir + '/data-gen/output.txt'
-    output_file2 = file_dir + '/data-gen/output2.txt'
+    output_file = file_dir + '/tweet_output/ft1.txt'
+    output_file2 = file_dir + '/tweet_output/ft2.txt'
     
     
     print_out("Starting Feature 1")
     process_tweets(input_file, output_file)
+    print_out("Done with Feature 1")
     
     # Solution to feature 2
     print_out("Starting Feature 2")
     solution_2 = InsightChallengeSolution(input_file, output_file2)
     solution_2.build_hashtag_graph()
-
+    print_out("Done with Feature 2")
+    
+    
     # For Debugging do not uncomment unless needed.
     #solution_2.display_hashtag_graph()
     
