@@ -41,22 +41,29 @@ class Graph(object):
     '''
     
     def add_vertex(self, vertex):
+        print "=====> add_vertex() Graph before add_vertex: {}".format(self.graph_dict)
         if vertex not in self.graph_dict:
             self.graph_dict[vertex] = []
+            print "=====> add_vertex() - Adding  vertex: {} to graph now: {}".format(vertex, self.graph_dict)
 
-     '''
+    '''
         Setter: Adds an edge to a graph
         
         Edge is assumed as a set of iterable; tuple, list or set
     '''       
     
     def add_edge(self, edge):
-        edge = set(edge)
+        print "=====> add_edge() Graph before add_edge: {}".format(self.graph_dict)
+        #edge = set(edge)
         (v1, v2) = tuple(edge)
+        print "=====> add_edge() -BEFORE ADDING . Adding {} to {}. graph now: {}".format(v2, v1, self.graph_dict)
         if v1 in self.graph_dict:
-            self.graph_dict[v1].append(v2)
+            if v2 not in self.graph_dict[v1]:
+                self.graph_dict[v1].append(v2)
+                print "=====> add_edge() - {} already in graph and {} not in list: {}, graph now: {}".format(v1, v2, self.graph_dict[v1], self.graph_dict)
         else:
             self.graph_dict[v1] = [v2]
+            print "=====> add_edge() - {} not in graph. Adding {} to {}. {} list: {}, graph now: {}".format(v1, v2, v1, v1, self.graph_dict[v1], self.graph_dict)
 
             
     '''
@@ -71,9 +78,21 @@ class Graph(object):
     
     def vertex_degree(self, vertex):
         neighbors =  self.graph_dict[vertex]
-        vertex_degree = len(neighbors) + neighbors.count(vertex)
-        return vertex_degree
+        #print "==> VERTEX: {}, Neighbors: {}".format(vertex, self.graph_dict[vertex])
+        degree = len(neighbors) + neighbors.count(vertex)
+        return degree
     
+    
+    '''
+        Calculate Complete Graph Average Degrees
+    '''
+    def get_graph_average_degrees(self):
+        running_total = 0
+        #print "Graph: {}".format(self.graph_dict)
+        for vertex in self.graph_dict:
+            running_total += self.vertex_degree(vertex)
+            #print "Vertex: {}, Vertex Degree: {}, Running Total: {}, Num Vertices: {}".format(vertex, self.vertex_degree(vertex), running_total, len(self.graph_dict))
+        return running_total / float(len(self.graph_dict))
     
     '''
         Helper Function: Generate the edges of the graph.
@@ -89,25 +108,6 @@ class Graph(object):
                     edges.append({vertex, neighbour})
         return edges
 
-    '''
-        Helper function: Update graph from a list of vertices tha define a sub-graph.
-        
-        Queue the vertices and create a edge from a vertex to the next in line using
-        queue rotatations.
-        
-        :type list_of_vertices: List[str]
-    '''
-    def update_graph(self, list_of_vertices):
-        # Internally queue vertices and create vertex and edge to neighbors
-        q = deque(list_of_vertices)
-        
-        for _ in xrange(len(list_of_vertices)):
-            self.add_vertex(q[0]) # Add vertex into graph
-            self.add_edge((q[0], q[1])) # Create edge between both vertex
-            q.rotate(-1) # Rotate queue clockwise, so 1st --> last, 2nd --> 1st, 3rd --> 2nd ...
-        
-        # Clean up
-        q.clear()
     
    
     '''
@@ -118,7 +118,7 @@ class Graph(object):
         result = "vertices: "
         for v in self.graph_dict:
             result += str(v) + " "
-        res += "\nedges: "
+        result += "\nedges: "
         for e in self.generate_graph_edges():
             result += str(e) + " "
         return result

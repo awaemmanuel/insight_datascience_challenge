@@ -4,7 +4,7 @@
 import unicodedata as ud, re, string, sys, os, simplejson
 from itertools import islice, chain
 from collections import OrderedDict, deque
-from helper-modules import Graph
+from helper_modules import graph
 
 ######### HELPER CLASSES #################
 def constant(f):
@@ -38,6 +38,13 @@ class color(object):
 
 
 ############## HELPER FUNCTIONS ####################
+
+'''
+    Print to Screen
+'''
+def print_out(str):
+    print str
+    sys.stdout.flush()
     
 '''
     Function to convert string internally to unicode
@@ -236,11 +243,11 @@ class InsightChallengeSolution(object):
         self.text = ''
         self.timestamp = 0
         self.lastupdate = 0
-        self.tags = set()
+        self.set_of_tags = set()
         
         # Tables to hold Tracking and Routing information of hashtags.
         self.tweet_time_hashtag_graph = OrderedDict() # Track time and associating hashtags
-        self.hashtag_graph = Graph() # Final graph of hashtag to hashtag
+        self.hashtag_graph = graph.Graph() # Final graph of hashtag to hashtag
         
         
         
@@ -273,32 +280,75 @@ class InsightChallengeSolution(object):
         
             # Retrieve hashtags if any in tweet
             if r'#' in self.text:
-                self.tags = get_hashtags()
+                self.set_of_tags = get_hashtags()
             else:
                 continue # No hashtags
 
                 
             # Track time of creating the hashtags
             created_at = ''.join(get_tweet_time())
-            self.tweet_time_hashtag_graph[created_at] = self.tags
+            self.tweet_time_hashtag_graph[created_at] = self.set_of_tags
             
             # Update hashtag graph, creating edges for 2 or more distinct tags 
-            # TODO - Figure a way to cycle once.
-            if (len(self.tags) > 1):
-                for tag in self.tags:
-                    self.tag_hashtag_graph[tag]
+            if (len(self.set_of_tags) > 1):
+                print_out("GETTING TO UPDATE")
+                self.hashtag_graph.update_graph(list(self.set_of_tags), False)
+                self.hashtag_graph.update_graph(list(self.set_of_tags), True)
             
             
         return None
     
     '''
+        Helper function: Update graph from a list of vertices tha define a sub-graph.
+        
+        Queue the vertices and create a edge from a vertex to the next in line using
+        queue rotatations.
+        Rotate queue clockwise, so 1st --> last, 2nd --> 1st, 3rd --> 2nd ...
+        
+        If hashtags are #Apache, #Hadoop, #Storm, 
+        we must create the following permutations(order matters) of edges:
+        
+            1. #Apache -- #Hadoop
+            2. #Hadoop -- #Storm
+            3. #Storm -- #Apache
+            4. #Storm -- #Hadoop
+            5. #Hadoop -- #Apache
+            6. #Apache -- #Storm
+        
+        
+        :type list_of_vertices: List[str]
+        :type reverse: boolean - reverse list to create second set of edge combinations
+        :type direction to rotate list (-n ==> n steps to left, n ==> n steps to right) : int
+    '''
+    def update_graph(self, list_of_vertices, reverse, dir=-1):
+        if len(list_of_vertices) < 2:
+            return
+        
+        # For second set of edge permuations from list
+        if (reverse):
+            list_of_vertices.reverse()
+            
+        q = deque(list_of_vertices)
+        
+        for i in xrange(len(list_of_vertices)):
+            print "===>update_graph: Run #{} Queue Before: {}".format(i, q)
+            print "=====>Need to add vertex {} and Edge {}".format(q[0], (q[0], q[1]))
+            self.hashtag_graph.add_vertex(q[0]) # Add vertex into graph
+            self.hashtag_graph.add_edge((q[0], q[1])) # Create edge between both vertex
+            
+            print "===>update_graph: Added vertex {} and Edge {}".format(q[0], (q[0], q[1]))
+            q.rotate(dir)
+            
+            print "===>Queue After: {}\n\n".format(q)
+        # Clean up
+        q.clear()
+        
+    
+    '''
         Calculate Graph Average Degrees
     '''
-    def get_graph_average_degrees(self):
-        running_total = 0         
-        for v, e in self.graph.iteritems():
-            running_total += len(e)
-        return running_total / float(len(self.graph))
+    def hashtag_graph_average_degrees(self):
+        return self.hashtag_graph.get_graph_average_degrees()
     
     
     
@@ -328,6 +378,8 @@ class InsightChallengeSolution(object):
     '''
     def display_hashtag_graph(self):
         print self.hashtag_graph
+        
+    
             
     ################# SCRIPT EXECUTION #######################
 if __name__ == '__main__':
@@ -336,6 +388,37 @@ if __name__ == '__main__':
     input_file = file_dir + '/data-gen/tweets.txt'
     output_file = file_dir + '/data-gen/output.txt'
     
-    process_tweets(input_file, output_file)
+    #### TESTING - Needs to be cleaned before submission ########
+    #Spark, #Apache (timestamp: Thu Oct 29 17:51:01 +0000 2015)
+    #Apache, #Hadoop, #Storm (timestamp: Thu Oct 29 17:51:30 +0000 2015)
+    #Apache (timestamp: Thu Oct 29 17:51:55 +0000 2015)
+    #Flink, #Spark (timestamp: Thu Oct 29 17:51:56 +0000 2015)
+    #HBase, #Spark (timestamp: Thu Oct 29 17:51:59 +0000 2015)
+    #Hadoop, #Apache (timestamp: Thu Oct 29 17:52:05 +0000 2015)
+    lt_0 = ['#Spark', '#Apache']
+    lt_1 = ['#Apache', '#Hadoop', '#Storm']
+    lt_2 = ['#Apache']
+    lt_3 = ['#Flink', '#Spark']
+    lt_4 = ['#HBase', '#Spark']
+    lt_5 = ['#Hadoop', '#Apache']
     
-    print "Done. OK!"
+    
+    #print_out("Starting Feature 1")
+    #process_tweets(input_file, output_file)
+    
+    # Solution to feature 2
+    print_out("Starting Feature 2")
+    solution_2 = InsightChallengeSolution(input_file, output_file)
+    cw = -1
+    ccw = 1
+    solution_2.update_graph(lt_0,False)
+    solution_2.update_graph(lt_0,True)
+    
+    solution_2.update_graph(lt_1, False)
+    solution_2.update_graph(lt_1, True)
+    #solution_2.update_graph(lt_2)
+    #solution_2.update_graph(lt_3)
+    solution_2.display_hashtag_graph()
+    print "Average Degree: {}".format(solution_2.hashtag_graph_average_degrees())
+    
+    print_out("Done. OK!")
